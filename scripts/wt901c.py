@@ -107,24 +107,49 @@ class WT901C_RS232:
     def __del__(self):
         self.close()
 
+    def activate_custom_comfiguration(self):
+        # https://forum.arduino.cc/t/help-calibrating-witmotion-inclinometer-through-ttl-with-mega2560/941394
+        data_bin = array.array("B", [0xFF, 0xF0, 0xF0, 0xF0, 0xF0]).tobytes()
+        self._ser.write(data_bin)
+        time.sleep(100 * 10e-6)
+
+        # Unlock configuration
+        data_bin = array.array("B", [0xFF, 0xAA, 0x69, 0x88, 0xB5]).tobytes()
+        self._ser.write(data_bin)
+        time.sleep(100 * 10e-6)
+
+    def set_attachment_direction_horisontal(self):
+        self.activate_custom_comfiguration()
+        data_bin = array.array("B", [0xFF, 0xAA, 0x05, 0x00, 0x00]).tobytes()
+        self._ser.write(data_bin)
+
+    def set_attachment_direction_vertical(self):
+        self.activate_custom_comfiguration()
+        data_bin = array.array("B", [0xFF, 0xAA, 0x05, 0x01, 0x00]).tobytes()
+        self._ser.write(data_bin)
+
     def run_sensor_calibration(self):
+        self.activate_custom_comfiguration()
         data_bin = array.array("B", [0xFF, 0xAA, 0x01, 0x01, 0x00]).tobytes()
         logger.info("Gyroscope and Accelerometer Calibration")
         self._ser.write(data_bin)
-        time.sleep(5)
-
-    def stop_sensor_calibration(self):
+        for _ in range(500):
+            while not self.update():
+                pass
         data_bin = array.array("B", [0xFF, 0xAA, 0x01, 0x00, 0x00]).tobytes()
-        logger.info("Gyroscope and Accelerometer Calibration")
         self._ser.write(data_bin)
+
+        self.set_bias_acceralation()
+        self.set_bias_angular_velocity()
+        logger.info("Calibration is done")
 
     def capture(self):
         data = self._ser.read(size=2)
         return data.hex()
 
-
     """ @TODO: unify uppercase and lowercase
     """
+
     def convert_acceralation_to_LH_uint8(self, acceralation: float):
         # @TODO: refactor
         acceralation_short = np.short(np.float64(acceralation) * 32768.0 / 16.0)
@@ -150,6 +175,44 @@ class WT901C_RS232:
         self._acceralation_y = float(np.short((AyH << 8) | AyL) / 32768.0 * 16.0)
         self._acceralation_z = float(np.short((AzH << 8) | AzL) / 32768.0 * 16.0)
 
+    def set_bias_acceralation(self):
+        self.activate_custom_comfiguration()
+        AxL, AxH = self.convert_acceralation_to_LH_uint8(self.acceralation[0])
+        # data_bin = array.array("B", [0xFF, 0xAA, 0x05, AxL, AxH]).tobytes()
+        data_bin = array.array("B", [0xFF, 0xAA, 0x05, AxL, AxH]).tobytes()
+        self._ser.write(data_bin)
+
+        AyL, AyH = self.convert_acceralation_to_LH_uint8(self.acceralation[1])
+        data_bin = array.array("B", [0xFF, 0xAA, 0x06, AyL, AyH]).tobytes()
+        self._ser.write(data_bin)
+
+        AzL, AzH = self.convert_acceralation_to_LH_uint8(self.acceralation[2])
+        data_bin = array.array("B", [0xFF, 0xAA, 0x07, AzL, AzH]).tobytes()
+        self._ser.write(data_bin)
+
+        time.sleep(100 * 10e-6)
+
+    """ @TODO: refactor
+    """
+
+    def set_frame_rate_5(self):
+        self.activate_custom_comfiguration()
+        data_bin = array.array("B", [0xFF, 0xAA, 0x03, 0x05, 0x00]).tobytes()
+        self._ser.write(data_bin)
+        time.sleep(100 * 10e-6)
+
+    def set_frame_rate_50(self):
+        self.activate_custom_comfiguration()
+        data_bin = array.array("B", [0xFF, 0xAA, 0x03, 0x08, 0x00]).tobytes()
+        self._ser.write(data_bin)
+        time.sleep(100 * 10e-6)
+
+    def set_frame_rate_100(self):
+        self.activate_custom_comfiguration()
+        data_bin = array.array("B", [0xFF, 0xAA, 0x03, 0x09, 0x00]).tobytes()
+        self._ser.write(data_bin)
+        time.sleep(100 * 10e-6)
+
     def convert_angular_velocity_to_LH_uint8(self, angular_velocity: float):
         # @TODO: refactor
         angular_velocity_short = np.short(np.float64(angular_velocity) / 2000 * 32768)
@@ -173,7 +236,6 @@ class WT901C_RS232:
         self._angular_velocity_x = float(np.short((wxH << 8) | wxL) / 32768.0 * 2000.0)
         self._angular_velocity_y = float(np.short((wyH << 8) | wyL) / 32768.0 * 2000.0)
         self._angular_velocity_z = float(np.short((wzH << 8) | wzL) / 32768.0 * 2000.0)
-        print([np.deg2rad(av) for av in [self._angular_velocity_x, self._angular_velocity_y, self._angular_velocity_z]])
 
     def _parse_anglular_output(self, read_data):
         start_address_3 = int(read_data[44:46], 16)
@@ -189,6 +251,23 @@ class WT901C_RS232:
         self._angle_roll = float(np.short((RollH << 8) | RollL) / 32768.0 * 180.0)
         self._angle_pitch = float(np.short((PitchH << 8) | PitchL) / 32768.0 * 180.0)
         self._angle_yaw = float(np.short((YawH << 8) | YawL) / 32768.0 * 180.0)
+
+    def set_bias_angular_velocity(self):
+        self.activate_custom_comfiguration()
+        wxL, wxH = self.convert_angular_velocity_to_LH_uint8(self.angular_velocity[0])
+        wyL, wyH = self.convert_angular_velocity_to_LH_uint8(self.angular_velocity[1])
+        wzL, wzH = self.convert_angular_velocity_to_LH_uint8(self.angular_velocity[2])
+
+        data_bin = array.array("B", [0xFF, 0xAA, 0x08, wxL, wxH]).tobytes()
+        self._ser.write(data_bin)
+
+        data_bin = array.array("B", [0xFF, 0xAA, 0x09, wyL, wyH]).tobytes()
+        self._ser.write(data_bin)
+
+        data_bin = array.array("B", [0xFF, 0xAA, 0x0A, wzL, wzH]).tobytes()
+        self._ser.write(data_bin)
+
+        time.sleep(100 * 10e-6)
 
     def _parse_magnetic_output(self, read_data):
         start_address_4 = int(read_data[66:68], 16)
@@ -250,14 +329,8 @@ class WT901C_RS232:
         self._bias_angle_pitch = bias_angle_pitch
         self._bias_angle_yaw = bias_angle_yaw
 
-    def set_angular_velocity_bias(self, bias_angular_velocity_x_deg: float, bias_angular_velocity_y_deg: float, bias_angular_velocity_z_deg: float):
-        self._bias_angular_velocity_x = np.rad2deg(bias_angular_velocity_x_deg)
-        self._bias_angular_velocity_y = np.rad2deg(bias_angular_velocity_y_deg)
-        self._bias_angular_velocity_z = np.rad2deg(bias_angular_velocity_z_deg)
-
     def initialize_angle(self):
         self.set_angle_bias(*self.angle_rpy)
-        self.set_angular_velocity_bias(*self.angular_velocity)
 
     @property
     def acceralation(self):
@@ -267,12 +340,7 @@ class WT901C_RS232:
     @property
     def angular_velocity(self):
         with self._lock:
-            angular_velocity_compensated = [
-                self._angular_velocity_x - self._bias_angular_velocity_x,
-                self._angular_velocity_y - self._bias_angular_velocity_y,
-                self._angular_velocity_z - self._bias_angular_velocity_z,
-            ]
-            return np.array([np.deg2rad(angvec) for angvec in angular_velocity_compensated]).copy()
+            return np.array([np.deg2rad(angvec) for angvec in [self._angular_velocity_x, self._angular_velocity_y, self._angular_velocity_z]]).copy()
 
     @property
     def angle_rpy(self):

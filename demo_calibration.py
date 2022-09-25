@@ -8,25 +8,20 @@ logging.getLogger().setLevel(logging.INFO)
 
 PORT = "/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0"
 BAUDRATE = 115200
-N_ITER = 100
+N_ITER = 5
 
 wt901c = WT901C_RS232(PORT, BAUDRATE)
 wt901c.open()
 
 # Initialize angle information (assume sensor is under stationary state)
 print("Start to initialize angle params")
-wt901c.set_attachment_direction_horisontal()
 wt901c.set_frame_rate_100()
-wt901c.run_sensor_calibration()
-wt901c.set_frame_rate_50()
-wt901c.initialize_angle()
-for _ in range(N_ITER):
-    start = time.time()
-    while not wt901c.update():
-        pass
-    end = time.time()
-    # @NOTE: Due to setting
-    print(wt901c)
-    print("FPS: ", 1.0 / float(end - start))
+while not wt901c.update():
+    pass
+print(wt901c)
 
+wt901c.run_sensor_calibration()
+while not wt901c.update():
+    pass
+print(wt901c)
 wt901c.close()
