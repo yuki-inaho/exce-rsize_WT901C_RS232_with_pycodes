@@ -45,7 +45,7 @@ class WT901C_RS232:
     def __str__(self):
         acc_str = f"Accelaration: {self.angular_velocity} [m * s^(-2)]\n"
         ang_str = f"Angular Velocity: {self.acceralation} [rad * s^(-1)]\n"
-        magnetic_str = f"Magnetic: {self.magnetic} [T?]\n"
+        magnetic_str = f"Magnetic: {self.magnetic} [T*10^(-6)]\n"
         angle_str = f"Angle: {self.angle_rpy} [deg]\n"
         return acc_str + ang_str + magnetic_str + angle_str
 
