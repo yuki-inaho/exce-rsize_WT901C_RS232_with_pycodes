@@ -23,6 +23,7 @@ wt901c.run_sensor_calibration()
 wt901c.set_frame_rate_5()
 wt901c.initialize_angle()
 tilt_estimator = Tilt(as_angles=True)
+
 tilt_initial = tilt_estimator.estimate(acc=wt901c.acceralation)
 for _ in range(N_ITER):
     while not wt901c.update():
