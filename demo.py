@@ -18,6 +18,7 @@ for _ in range(N_ITER):
     while not wt901c.update():
         pass
     end = time.time()
+    # @NOTE: currently around 10fps?
     print("elapsed: ", end - start)
-    print(wt901c.acceration, wt901c.magnetic, wt901c.angle_rpy, wt901c.angular_velocity)
+    print(wt901c)
 wt901c.close()

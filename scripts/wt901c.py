@@ -39,6 +39,12 @@ class WT901C_RS232:
         self._magnetic_y = 0
         self._magnetic_z = 0
 
+    def __str__(self):
+        acc_str = f"Accelaration: {self.angular_velocity} [m * s^(-2)]\n"
+        ang_str = f"Angular Velocity: {self.acceration} [deg * s^(-1)]\n"
+        magnetic_str  = f"magnetic: {self.magnetic} [T?]\n"
+        return acc_str + ang_str + magnetic_str
+
     def _validate_baudrate(self, baud: int):
         if baud not in SUPPORTED_BAUDRATE_LIST:
             raise ValueError(f"The given baudrate is not supported")
