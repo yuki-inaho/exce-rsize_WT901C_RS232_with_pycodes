@@ -1,6 +1,3 @@
-""" I rely heavily on the code the below repository
-    https://github.com/6Harmony9/Witmotion-WT901CTTL-Python
-"""
 import time
 import serial
 import logging
@@ -41,8 +38,8 @@ class WT901C_RS232:
 
     def __str__(self):
         acc_str = f"Accelaration: {self.angular_velocity} [m * s^(-2)]\n"
-        ang_str = f"Angular Velocity: {self.acceration} [deg * s^(-1)]\n"
-        magnetic_str  = f"magnetic: {self.magnetic} [T?]\n"
+        ang_str = f"Angular Velocity: {self.acceration} [rad * s^(-1)]\n"
+        magnetic_str = f"magnetic: {self.magnetic} [T?]\n"
         return acc_str + ang_str + magnetic_str
 
     def _validate_baudrate(self, baud: int):
@@ -205,16 +202,16 @@ class WT901C_RS232:
 
     @property
     def acceration(self):
-        return np.array([self._acceraration_x, self._acceraration_y, self._acceraration_z])
+        return np.array([self._acceraration_x, self._acceraration_y, self._acceraration_z]).copy()
 
     @property
     def angular_velocity(self):
-        return np.array([self._angular_velocity_x, self._angular_velocity_y, self._angular_velocity_z])
+        return np.array([np.deg2rad(angvec) for angvec in [self._angular_velocity_x, self._angular_velocity_y, self._angular_velocity_z]]).copy()
 
     @property
     def angle_rpy(self):
-        return np.array([self._angle_roll, self._angle_pitch, self._angle_yaw])
+        return np.array([self._angle_roll, self._angle_pitch, self._angle_yaw]).copy()
 
     @property
     def magnetic(self):
-        return np.array([self._magnetic_x, self._magnetic_y, self._magnetic_z])
+        return np.array([self._magnetic_x, self._magnetic_y, self._magnetic_z]).copy()
