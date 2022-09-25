@@ -16,13 +16,13 @@ SUPPORTED_BAUDRATE_LIST = [9600]
 class WT901C_RS232:
     def __init__(self, port: str, baudrate: int):
         self._ser = serial.Serial(timeout=0.1)
-        self._ser = self._initialize(self._ser, port, baudrate)
+        self._initialize_serial_communication(port, baudrate)
 
         """ Initialize AHRS Information
         """
-        self._acceraration_x = 0
-        self._acceraration_y = 0
-        self._acceraration_z = 0
+        self._acceralation_x = 0
+        self._acceralation_y = 0
+        self._acceralation_z = 0
 
         self._angular_velocity_x = 0
         self._angular_velocity_y = 0
@@ -38,7 +38,7 @@ class WT901C_RS232:
 
     def __str__(self):
         acc_str = f"Accelaration: {self.angular_velocity} [m * s^(-2)]\n"
-        ang_str = f"Angular Velocity: {self.acceration} [rad * s^(-1)]\n"
+        ang_str = f"Angular Velocity: {self.acceralation} [rad * s^(-1)]\n"
         magnetic_str = f"magnetic: {self.magnetic} [T?]\n"
         return acc_str + ang_str + magnetic_str
 
@@ -46,11 +46,9 @@ class WT901C_RS232:
         if baud not in SUPPORTED_BAUDRATE_LIST:
             raise ValueError(f"The given baudrate is not supported")
 
-    def _initialize(self, ser: serial.Serial, port: str, baudrate: int):
+    def _initialize_serial_communication(self, port: str, baudrate: int):
         self._validate_baudrate(baudrate)
-
         """
-            @TODO: return by refference?
             @TODO: impl parity mode
         """
         self._ser.port = port
@@ -63,7 +61,6 @@ class WT901C_RS232:
         self._ser.rtscts = False  # disable hardware (RTS/CTS) flow control
         self._ser.dsrdtr = False  # disable hardware (DSR/DTR) flow control
         self._ser.writeTimeout = 2  # timeout for write
-        return self._ser
 
     def open(self):
         if not self._ser.isOpen():
@@ -98,7 +95,7 @@ class WT901C_RS232:
     """ @TODO: unify uppercase and lowercase
     """
 
-    def _parse_acceraration_output(self, read_data):
+    def _parse_acceralation_output(self, read_data):
         header_A_L = int(read_data[0:2], 16)
         header_A_H = int(read_data[2:4], 16)
         AxL = int(read_data[4:6], 16)
@@ -111,9 +108,9 @@ class WT901C_RS232:
         TH_A = int(read_data[18:20], 16)
         SUM_A = int(read_data[20:22], 16)
 
-        self._acceraration_x = float(np.short((AxH << 8) | AxL) / 32768.0 * 16.0)
-        self._acceraration_y = float(np.short((AyH << 8) | AyL) / 32768.0 * 16.0)
-        self._acceraration_z = float(np.short((AzH << 8) | AzL) / 32768.0 * 16.0)
+        self._acceralation_x = float(np.short((AxH << 8) | AxL) / 32768.0 * 16.0)
+        self._acceralation_y = float(np.short((AyH << 8) | AyL) / 32768.0 * 16.0)
+        self._acceralation_z = float(np.short((AzH << 8) | AzL) / 32768.0 * 16.0)
 
     def _parse_angular_velocity_output(self, read_data):
         start_address_2 = int(read_data[22:24], 16)
@@ -166,7 +163,7 @@ class WT901C_RS232:
 
     def _parse_data(self, read_data):
         assert len(read_data) == 88
-        self._parse_acceraration_output(read_data)
+        self._parse_acceralation_output(read_data)
         self._parse_angular_velocity_output(read_data)
         self._parse_anglular_output(read_data)
         self._parse_magnetic_output(read_data)
@@ -201,8 +198,8 @@ class WT901C_RS232:
             return False
 
     @property
-    def acceration(self):
-        return np.array([self._acceraration_x, self._acceraration_y, self._acceraration_z]).copy()
+    def acceralation(self):
+        return np.array([self._acceralation_x, self._acceralation_y, self._acceralation_z]).copy()
 
     @property
     def angular_velocity(self):
