@@ -218,8 +218,7 @@ class WT901C_RS232:
 
     @property
     def angular_velocity(self):
-        #return np.array([np.deg2rad(angvec) for angvec in [self._angular_velocity_x, self._angular_velocity_y, self._angular_velocity_z]]).copy()
-        return np.array([self._angular_velocity_x, self._angular_velocity_y, self._angular_velocity_z]).copy()
+        return np.array([np.deg2rad(angvec) for angvec in [self._angular_velocity_x, self._angular_velocity_y, self._angular_velocity_z]]).copy()
 
     @property
     def angle_rpy(self):
