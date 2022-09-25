@@ -1,2 +1,6 @@
 numpy
 pyserial
+
+# For demos
+AHRS
+pytransform3d

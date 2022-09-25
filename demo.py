@@ -13,6 +13,12 @@ N_ITER = 100
 wt901c = WT901C_RS232(PORT, BAUDRATE)
 wt901c.open()
 
+# Initialize angle information (assume sensor is under stationary state)
+print("Start to initialize angle params")
+while not wt901c.update():
+    pass
+wt901c.initialize_angle()
+
 for _ in range(N_ITER):
     start = time.time()
     while not wt901c.update():

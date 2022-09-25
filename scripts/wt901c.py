@@ -15,7 +15,7 @@ SUPPORTED_BAUDRATE_LIST = [9600]
 
 class WT901C_RS232:
     def __init__(self, port: str, baudrate: int):
-        self._ser = serial.Serial(timeout=0.1)
+        self._ser = serial.Serial()
         self._initialize_serial_communication(port, baudrate)
 
         """ Initialize AHRS Information
@@ -36,15 +36,22 @@ class WT901C_RS232:
         self._magnetic_y = 0
         self._magnetic_z = 0
 
+        """ Parameter biases
+        """
+        self._bias_angle_roll = 0
+        self._bias_angle_pitch = 0
+        self._bias_angle_yaw = 0
+
     def __str__(self):
         acc_str = f"Accelaration: {self.angular_velocity} [m * s^(-2)]\n"
         ang_str = f"Angular Velocity: {self.acceralation} [rad * s^(-1)]\n"
-        magnetic_str = f"magnetic: {self.magnetic} [T?]\n"
-        return acc_str + ang_str + magnetic_str
+        magnetic_str = f"Magnetic: {self.magnetic} [T?]\n"
+        angle_str = f"Angle: {self.angle_rpy} [deg]\n"
+        return acc_str + ang_str + magnetic_str + angle_str
 
     def _validate_baudrate(self, baud: int):
         if baud not in SUPPORTED_BAUDRATE_LIST:
-            raise ValueError(f"The given baudrate is not supported")
+            raise ValueError("The given baudrate is not supported")
 
     def _initialize_serial_communication(self, port: str, baudrate: int):
         self._validate_baudrate(baudrate)
@@ -197,17 +204,28 @@ class WT901C_RS232:
         else:
             return False
 
+    def set_angle_bias(self, bias_angle_roll: float, bias_angle_pitch: float, bias_angle_yaw: float):
+        self._bias_angle_roll = bias_angle_roll
+        self._bias_angle_pitch = bias_angle_pitch
+        self._bias_angle_yaw = bias_angle_yaw
+
+    def initialize_angle(self):
+        self.set_angle_bias(*self.angle_rpy)
+
     @property
     def acceralation(self):
         return np.array([self._acceralation_x, self._acceralation_y, self._acceralation_z]).copy()
 
     @property
     def angular_velocity(self):
-        return np.array([np.deg2rad(angvec) for angvec in [self._angular_velocity_x, self._angular_velocity_y, self._angular_velocity_z]]).copy()
+        #return np.array([np.deg2rad(angvec) for angvec in [self._angular_velocity_x, self._angular_velocity_y, self._angular_velocity_z]]).copy()
+        return np.array([self._angular_velocity_x, self._angular_velocity_y, self._angular_velocity_z]).copy()
 
     @property
     def angle_rpy(self):
-        return np.array([self._angle_roll, self._angle_pitch, self._angle_yaw]).copy()
+        return np.array(
+            [self._angle_roll - self._bias_angle_roll, self._angle_pitch - self._bias_angle_pitch, self._angle_yaw - self._bias_angle_yaw]
+        ).copy()
 
     @property
     def magnetic(self):
