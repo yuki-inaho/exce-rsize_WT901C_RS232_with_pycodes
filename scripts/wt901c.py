@@ -5,7 +5,7 @@ import numpy as np
 
 
 logger = logging.getLogger("WT901C_RS232")
-SUPPORTED_BAUDRATE_LIST = [9600]
+SUPPORTED_BAUDRATE_LIST = [9600, 115200]
 
 """ @TODO: Update error message
     @TODO: Add mutex lines
