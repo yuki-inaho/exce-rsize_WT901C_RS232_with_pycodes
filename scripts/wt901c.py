@@ -4,8 +4,6 @@ import logging
 import numpy as np
 import array
 import threading
-import struct
-from ctypes import *
 
 logger = logging.getLogger("WT901C_RS232")
 SUPPORTED_BAUDRATE_LIST = [9600, 115200]
