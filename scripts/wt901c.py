@@ -2,7 +2,10 @@ import time
 import serial
 import logging
 import numpy as np
-
+import array
+import threading
+import struct
+from ctypes import *
 
 logger = logging.getLogger("WT901C_RS232")
 SUPPORTED_BAUDRATE_LIST = [9600, 115200]
@@ -14,38 +17,46 @@ SUPPORTED_BAUDRATE_LIST = [9600, 115200]
 
 
 class WT901C_RS232:
-    def __init__(self, port: str, baudrate: int):
+    def __init__(self, port: str, baudrate: int, scale_magnetic_field: float = 10e-5):
+        self._lock = threading.RLock()
+
         self._ser = serial.Serial()
         self._initialize_serial_communication(port, baudrate)
 
         """ Initialize AHRS Information
         """
-        self._acceralation_x = 0
-        self._acceralation_y = 0
-        self._acceralation_z = 0
+        self._acceralation_x: float = 0
+        self._acceralation_y: float = 0
+        self._acceralation_z: float = 0
 
-        self._angular_velocity_x = 0
-        self._angular_velocity_y = 0
-        self._angular_velocity_z = 0
+        self._angular_velocity_x: float = 0
+        self._angular_velocity_y: float = 0
+        self._angular_velocity_z: float = 0
 
-        self._angle_roll = 0
-        self._angle_pitch = 0
-        self._angle_yaw = 0
+        self._angle_roll: float = 0
+        self._angle_pitch: float = 0
+        self._angle_yaw: float = 0
 
-        self._magnetic_x = 0
-        self._magnetic_y = 0
-        self._magnetic_z = 0
+        self._magnetic_x: float = 0
+        self._magnetic_y: float = 0
+        self._magnetic_z: float = 0
+
+        self._scale_magnetic_field = scale_magnetic_field
 
         """ Parameter biases
         """
-        self._bias_angle_roll = 0
-        self._bias_angle_pitch = 0
-        self._bias_angle_yaw = 0
+        self._bias_angular_velocity_x: float = 0
+        self._bias_angular_velocity_y: float = 0
+        self._bias_angular_velocity_z: float = 0
+
+        self._bias_angle_roll: float = 0
+        self._bias_angle_pitch: float = 0
+        self._bias_angle_yaw: float = 0
 
     def __str__(self):
-        acc_str = f"Accelaration: {self.angular_velocity} [m * s^(-2)]\n"
-        ang_str = f"Angular Velocity: {self.acceralation} [rad * s^(-1)]\n"
-        magnetic_str = f"Magnetic: {self.magnetic} [T*10^(-6)]\n"
+        acc_str = f"Accelaration: {self.acceralation} [m * s^(-2)]\n"
+        ang_str = f"Angular Velocity: {self.angular_velocity} [rad * s^(-1)]\n"
+        magnetic_str = f"Magnetic: {self.magnetic} [T]\n"
         angle_str = f"Angle: {self.angle_rpy} [deg]\n"
         return acc_str + ang_str + magnetic_str + angle_str
 
@@ -96,11 +107,31 @@ class WT901C_RS232:
     def __del__(self):
         self.close()
 
+    def run_sensor_calibration(self):
+        data_bin = array.array("B", [0xFF, 0xAA, 0x01, 0x01, 0x00]).tobytes()
+        logger.info("Gyroscope and Accelerometer Calibration")
+        self._ser.write(data_bin)
+        time.sleep(5)
+
+    def stop_sensor_calibration(self):
+        data_bin = array.array("B", [0xFF, 0xAA, 0x01, 0x00, 0x00]).tobytes()
+        logger.info("Gyroscope and Accelerometer Calibration")
+        self._ser.write(data_bin)
+
     def capture(self):
-        return self._ser.read(size=2).hex()
+        data = self._ser.read(size=2)
+        return data.hex()
+
 
     """ @TODO: unify uppercase and lowercase
     """
+    def convert_acceralation_to_LH_uint8(self, acceralation: float):
+        # @TODO: refactor
+        acceralation_short = np.short(np.float64(acceralation) * 32768.0 / 16.0)
+        acceralation_H = np.uint8(acceralation_short // 256)
+        acceralation_L = np.uint8(acceralation_short % 256)
+        # assert (acceralation_H == wH) and (acceralation_L == wL)
+        return acceralation_L, acceralation_H
 
     def _parse_acceralation_output(self, read_data):
         header_A_L = int(read_data[0:2], 16)
@@ -119,6 +150,14 @@ class WT901C_RS232:
         self._acceralation_y = float(np.short((AyH << 8) | AyL) / 32768.0 * 16.0)
         self._acceralation_z = float(np.short((AzH << 8) | AzL) / 32768.0 * 16.0)
 
+    def convert_angular_velocity_to_LH_uint8(self, angular_velocity: float):
+        # @TODO: refactor
+        angular_velocity_short = np.short(np.float64(angular_velocity) / 2000 * 32768)
+        angular_velocity_short_H = np.uint8(angular_velocity_short // 256)
+        angular_velocity_short_L = np.uint8(angular_velocity_short % 256)
+        # assert (angular_velocity_short_H == wH) and (angular_velocity_short_L == wL)
+        return angular_velocity_short_L, angular_velocity_short_H
+
     def _parse_angular_velocity_output(self, read_data):
         start_address_2 = int(read_data[22:24], 16)
         start_address_w = int(read_data[24:26], 16)
@@ -134,6 +173,7 @@ class WT901C_RS232:
         self._angular_velocity_x = float(np.short((wxH << 8) | wxL) / 32768.0 * 2000.0)
         self._angular_velocity_y = float(np.short((wyH << 8) | wyL) / 32768.0 * 2000.0)
         self._angular_velocity_z = float(np.short((wzH << 8) | wzL) / 32768.0 * 2000.0)
+        print([np.deg2rad(av) for av in [self._angular_velocity_x, self._angular_velocity_y, self._angular_velocity_z]])
 
     def _parse_anglular_output(self, read_data):
         start_address_3 = int(read_data[44:46], 16)
@@ -180,52 +220,69 @@ class WT901C_RS232:
         @TODO: Implement Timeout or deadlock behavior handling
         @TODO: Check is_recoding is necessary?
         """
-        is_recording = False
-        read_data = ""
-        if self._ser.is_open:
-            while True:
-                read_data = self.capture()
-                if read_data == "5551":
-                    is_recording = True
-                    break
-                else:
-                    self.reset()
-                    time.sleep(100 * 10e-6)
-            while is_recording:
-                captured_data = self.capture()
-                if len(captured_data) < 4:
-                    return False
-                read_data = read_data + captured_data
-                if len(read_data) == 88:
-                    is_recording = False
+        with self._lock:
             is_recording = False
-            self._parse_data(read_data)
-            return True
-        else:
-            return False
+            read_data = ""
+            if self._ser.is_open:
+                while True:
+                    read_data = self.capture()
+                    if read_data == "5551":
+                        is_recording = True
+                        break
+                    else:
+                        self.reset()
+                        time.sleep(100 * 10e-6)
+                while is_recording:
+                    captured_data = self.capture()
+                    if len(captured_data) < 4:
+                        return False
+                    read_data = read_data + captured_data
+                    if len(read_data) == 88:
+                        is_recording = False
+                is_recording = False
+                self._parse_data(read_data)
+                return True
+            else:
+                return False
 
     def set_angle_bias(self, bias_angle_roll: float, bias_angle_pitch: float, bias_angle_yaw: float):
         self._bias_angle_roll = bias_angle_roll
         self._bias_angle_pitch = bias_angle_pitch
         self._bias_angle_yaw = bias_angle_yaw
 
+    def set_angular_velocity_bias(self, bias_angular_velocity_x_deg: float, bias_angular_velocity_y_deg: float, bias_angular_velocity_z_deg: float):
+        self._bias_angular_velocity_x = np.rad2deg(bias_angular_velocity_x_deg)
+        self._bias_angular_velocity_y = np.rad2deg(bias_angular_velocity_y_deg)
+        self._bias_angular_velocity_z = np.rad2deg(bias_angular_velocity_z_deg)
+
     def initialize_angle(self):
         self.set_angle_bias(*self.angle_rpy)
+        self.set_angular_velocity_bias(*self.angular_velocity)
 
     @property
     def acceralation(self):
-        return np.array([self._acceralation_x, self._acceralation_y, self._acceralation_z]).copy()
+        with self._lock:
+            return np.array([self._acceralation_x, self._acceralation_y, self._acceralation_z]).copy()
 
     @property
     def angular_velocity(self):
-        return np.array([np.deg2rad(angvec) for angvec in [self._angular_velocity_x, self._angular_velocity_y, self._angular_velocity_z]]).copy()
+        with self._lock:
+            angular_velocity_compensated = [
+                self._angular_velocity_x - self._bias_angular_velocity_x,
+                self._angular_velocity_y - self._bias_angular_velocity_y,
+                self._angular_velocity_z - self._bias_angular_velocity_z,
+            ]
+            return np.array([np.deg2rad(angvec) for angvec in angular_velocity_compensated]).copy()
 
     @property
     def angle_rpy(self):
-        return np.array(
-            [self._angle_roll - self._bias_angle_roll, self._angle_pitch - self._bias_angle_pitch, self._angle_yaw - self._bias_angle_yaw]
-        ).copy()
+        with self._lock:
+            return np.array(
+                [self._angle_roll - self._bias_angle_roll, self._angle_pitch - self._bias_angle_pitch, self._angle_yaw - self._bias_angle_yaw]
+            ).copy()
 
     @property
     def magnetic(self):
-        return np.array([self._magnetic_x, self._magnetic_y, self._magnetic_z]).copy()
+        with self._lock:
+            magnetic_field_scaled = [float(mg) * self._scale_magnetic_field for mg in [self._magnetic_x, self._magnetic_y, self._magnetic_z]]
+            return np.array(magnetic_field_scaled).copy()
