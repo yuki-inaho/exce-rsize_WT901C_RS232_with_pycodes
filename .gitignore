@@ -1,2 +1,4 @@
 .vscode
 /pyproject.toml
+poetry.lock
+*.pyc
