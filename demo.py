@@ -18,7 +18,7 @@ print("Start to initialize angle params")
 wt901c.set_attachment_direction_vertical()
 wt901c.set_frame_rate_100()
 wt901c.run_sensor_calibration()
-wt901c.set_frame_rate_50()
+wt901c.set_frame_rate_5()
 wt901c.initialize_angle()
 for _ in range(N_ITER):
     start = time.time()

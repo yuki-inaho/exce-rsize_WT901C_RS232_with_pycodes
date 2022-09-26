@@ -2,5 +2,6 @@ numpy
 pyserial
 
 # For experimental demos
-#AHRS
-#pytransform3d
+AHRS
+open3d  #For pytransform3d
+pytransform3d
